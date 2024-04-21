@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "./app.css";
 import "./StarRating";
 import StarRating from "./StarRating";
+import { useMovies } from "./useMovies";
 
 const tempMovieData = [
   {
@@ -176,7 +177,7 @@ function WatchedSummary({ watched }) {
         </p>
         <p>
           <span>⏳</span>
-          <span>{avgRuntime} min</span>
+          <span>{avgRuntime.toFixed(2)} min</span>
         </p>
       </div>
     </div>
@@ -242,12 +243,16 @@ function ErrorMessage({ message }) {
 const KEY = "7701c516";
 
 export default function App() {
-  const [movies, setMovies] = useState([]);
-  const [watched, setWatched] = useState([]);
   const [query, setQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+  const [watched, setWatched] = useState(function () {
+    const watchedValue = localStorage.getItem("watched");
+    return JSON.parse(watchedValue);
+  });
+  // never do this : we shold never call function in usestate isted we shold pass a function
+  //  useState(localStorage.getItem("watched"))
+  const {movies,isLoading,error}=  useMovies(query,handleCloseMovie);
+
 
   function handleSelectMovie(id) {
     setSelectedId((selectedId) => (id === selectedId ? null : id));
@@ -265,45 +270,11 @@ export default function App() {
 
   useEffect(
     function () {
-    const controller = new AbortController();
-      async function fetchMovie() {
-        try {
-          setIsLoading(true);
-          setError("");
-          const res = await fetch(
-            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
-          );
-          if (!res.ok) throw new Error("Something went wrong");
-
-          const data = await res.json();
-          if (data.Response === "False") throw new Error("Movie not found");
-
-          setMovies(data.Search);
-          
-          setError("");
-
-        } catch (err) {
-          console.error(err.message);
-          if(err.message!=="AbortError")
-          setError(err.message);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-      if (query.length < 3) {
-        setMovies([]);
-        setError("");
-        return;
-      }
-
-      fetchMovie();
-
-      return function(){
-        controller.abort();
-      }
+      localStorage.setItem("watched", JSON.stringify(watched));
     },
-    [query]
+    [watched]
   );
+
 
   return (
     <>
@@ -379,19 +350,17 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
     onCloseMovie();
   }
 
-  useEffect(
-    function(){
-      function callback(e){
-          if(e.code==="Escape"){
-            onCloseMovie();
-          }
-      }
-      document.addEventListener("keydown",callback);
-      return function(){
-        document.removeEventListener("keydown",callback);
+  useEffect(function () {
+    function callback(e) {
+      if (e.code === "Escape") {
+        onCloseMovie();
       }
     }
-  ,[])
+    document.addEventListener("keydown", callback);
+    return function () {
+      document.removeEventListener("keydown", callback);
+    };
+  }, []);
 
   useEffect(
     function () {
@@ -416,9 +385,9 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
       if (!title) return;
       document.title = `Movie | ${title}`;
 
-      return function(){
-        document.title=`usePopcorn`
-      }
+      return function () {
+        document.title = `usePopcorn`;
+      };
     },
     [title]
   );
